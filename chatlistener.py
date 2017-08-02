@@ -1,3 +1,5 @@
+__version__ = 0.1
+__author__ = "Atli"
 import socket, os
 from threading import Thread
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
