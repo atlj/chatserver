@@ -67,8 +67,11 @@ def accept():
     while 1:
         receive = c.recv(1024).decode("utf-8")
         if not receive == "":
-            recved = json.loads(receive)
-            received = recved["msg"]
+            try:
+                recved = json.loads(receive)
+                received = recved["msg"]
+            except Exception as e:
+                pass
 
         if receive == "":
             c.close()
