@@ -1,6 +1,7 @@
-__version__ = 0.1
+__version__ = 0.2
 __author__ = "Atli"
-import socket, os
+
+import socket, os, json
 from threading import Thread
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 import pickle
@@ -60,12 +61,16 @@ def accept():
     connected += 1
     print("{} has just connected.".format(addr))
     print(str(connected)+"/"+str(maxnumber))
-    c.send(bytes("WELCOME TO ATLI SERVER", "utf-8"))
+    c.send(bytes(json.dumps({"msg":"WELCOME TO ATLI SERVER","nick":"SV"}), "utf-8"))
     addrlist.append(addr)
     clientlist.append(c)
     while 1:
-        received = c.recv(1024).decode("utf-8")
-        if received == "":
+        receive = c.recv(1024).decode("utf-8")
+        if not receive == "":
+            recved = json.loads(receive)
+            received = recved["msg"]
+
+        if receive == "":
             c.close()
             print("{} has just disconnected.".format(addr))
             connected = connected - 1
@@ -75,28 +80,32 @@ def accept():
             threader("yes")
             break
         elif received == "login":
-            c.send(bytes("please enter your username:", "utf-8"))
+            c.send(bytes(json.dumps({"msg":"please enter your username:", "nick":"SV"}), "utf-8"))
             user = c.recv(1024).decode("utf-8")
-            c.send(bytes("ok need password", "utf-8"))
+            user = json.loads(user)
+            user = user["msg"]
+            c.send(bytes(json.dumps({"msg":"ok need password","nick":"SV"}), "utf-8"))
             passwd = c.recv(1024).decode("utf-8")
+            passwd = json.loads(passwd)
+            passwd = passwd["msg"]
             try:
                 if userlist[user] == passwd:
                     admin = True
-                    c.send(bytes("login completed welcome {}".format(user), "utf-8"))
+                    c.send(bytes(json.dumps({"msg":"login completed welcome {}".format(user), "nick":"SV"}), "utf-8"))
                     print("{} is logged in.".format(user))
                 else:
-                    c.send(bytes("incorrect authentication details", "UTF-8"))
+                    c.send(bytes(json.dumps({"msg":"incorrect authentication details", "nick":"SV"}), "UTF-8"))
                     print("unsuccesful login attempt")
             except Exception as e:
-                c.send(bytes("incorrect authentication details", "UTF-8"))
+                c.send(bytes(json.dumps({"msg":"incorrect authentication details", "nick":"SV"}), "UTF-8"))
                 print("unsuccesful login attempt")
                 pass
         else:
             if listenmode :
-                print(received)
+                print(recved["nick"]+" > "+received)
             for cli in clientlist:
                 if not cli == c:
-                    cli.send(bytes(received, "UTF-8"))
+                    cli.send(bytes(receive, "UTF-8"))
  
 def status():
     global listenmode
@@ -117,8 +126,9 @@ def status():
             c.close()
         s.close()
     if "say" in inp:
+        mesaj = " ".join(inp.split(" ")[1:])
         for c in clientlist:
-            c.send(bytes("SERVER: "+" ".join(inp.split(" ")[1:]), "UTF-8"))
+            c.send(bytes(json.dumps({"msg":mesaj, "nick":"SV"}), "UTF-8"))
     if inp == "listen":
         print("toggled listenmode on")
         listenmode = True
