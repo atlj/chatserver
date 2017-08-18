@@ -1,10 +1,10 @@
 __version__ = 0.2
 __author__ = "Atli"
 
-import socket, os, json
+import socket, os, json, time
 from threading import Thread
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-import pickle
+from time import ctime
 threads = []
 clientlist = []
 addrlist = []
@@ -15,7 +15,17 @@ userlist = {"atli":"atlariseverim", "easyly":"easyly"}
 listenmode = False
 newer = 0
 freshpool = []
+roomlist = {}
 threadnumber = 0
+connectedlist = {}
+
+def prepare(socketobject, message):
+    time = ctime().split(" ")
+    time = time[3]
+    strng = message
+    todump = {"msg":strng, "nick":"SV", "ctime":time}
+    socketobject.send(bytes(json.dumps(todump), "UTF-8"))
+
 
 def getipandport():
     global ip
@@ -59,20 +69,95 @@ def accept():
     admin = False
     c, addr = s.accept()
     connected += 1
+    idle = "login"
+    prepare(c, "Welcome to Atli server login or signup")
     print("{} has just connected.".format(addr))
     print(str(connected)+"/"+str(maxnumber))
-    c.send(bytes(json.dumps({"msg":"WELCOME TO ATLI SERVER","nick":"SV"}), "utf-8"))
     addrlist.append(addr)
     clientlist.append(c)
     while 1:
-        receive = c.recv(1024).decode("utf-8")
+        try:
+            receive = c.recv(1024).decode("utf-8")
+        except Exception as e:
+            pass
         if not receive == "":
             try:
                 recved = json.loads(receive)
                 received = recved["msg"]
             except Exception as e:
                 pass
-
+        if "msg" in received:
+            if idle == "suspend" or idle == "room":
+                splitted = received.split(" ")
+                nicktosend = splitted[1]
+                messagetosend = splitted[2:]
+                try:
+                    connectedlist[nicktosend].send(bytes(json.dumps({"msg" : " ".join(messagetosend), "nick":nick}), "UTF-8"))
+                except Exception as e:
+                    prepare(c, "Couldnt found any user named "+nicktosend) 
+        if idle == "login":
+            try:
+                if received == "login":
+                    prepare(c, "Please enter your username")
+                    user = json.loads(c.recv(1024).decode("utf-8"))
+                    user = user["msg"]
+                    prepare(c, "OK need password")
+                    passwd = json.loads(c.recv(1024).decode("utf-8"))
+                    passwd = passwd["msg"]
+                    try:
+                        if userlist[user] == passwd:
+                            prepare(c, "Succesful Login please enter to a room (join roomname)")
+                            nick = user
+                            idle = "suspend"
+                        else:
+                            prepare(c, "Incorrect Authantication Details")
+                    except Exception as e:
+                        prepare(c, "Incorrect Authantication Details")
+            except Exception as e:
+                pass
+                    
+        if idle == "suspend":
+            connectedlist[nick] = c
+            try:
+                wishedroom = json.loads(receive)
+                wishedroom = wishedroom["msg"]
+                if "join" in wishedroom:
+                    wishedroom = wishedroom.split(" ")[-1]
+                    try:
+                        room = wishedroom
+                        roomlist[room].append(c)
+                        idle = "room"
+                        prepare(c, "You re now in "+wishedroom+" channel")
+                        print("{} has just joined to {} channel".format(addr, room))
+                    except Exception as e:
+                        room = wishedroom
+                        roomlist[room] = []
+                        roomlist[room].append(c)
+                        prepare(c, "You re now in "+wishedroom+" channel")
+                        print("{} has just joined to {} channel".format(addr, room))
+                        idle = "room"
+                    
+            except Exception as e:
+                pass
+        if idle == "room":
+            try:
+                gelen = receive
+                gelen = json.loads(gelen)
+                gelen["nick"] = nick
+                if listenmode == True:
+                    print("{} > {} > {}".format(nick, room, gelen["msg"]))
+                if gelen["msg"] == "bye":
+                    idle = "suspend"
+                    roomlist[room].remove(c)
+                    prepare(c, "You have just leaved the room")
+                    print("{} has just disconnected from {} channel".format(addr, room))
+                gelen = json.dumps(gelen)              
+                for users in roomlist[room]:
+                    if not users == c:
+                        users.send(bytes(gelen, "UTF-8"))
+            except Exception as a:
+                pass
+        
         if receive == "":
             c.close()
             print("{} has just disconnected.".format(addr))
@@ -81,7 +166,14 @@ def accept():
             clientlist.remove(c)
             addrlist.remove(addr)
             threader("yes")
+            if idle == "suspend":
+                del connectedlist[nick]
+            if idle == "room":
+                del connectedlist[nick]
+                roomlist[room].remove(c)
+                
             break
+"""
         elif received == "login":
             c.send(bytes(json.dumps({"msg":"please enter your username:", "nick":"SV"}), "utf-8"))
             user = c.recv(1024).decode("utf-8")
@@ -109,7 +201,7 @@ def accept():
             for cli in clientlist:
                 if not cli == c:
                     cli.send(bytes(receive, "UTF-8"))
- 
+"""
 def status():
     global listenmode
     inp = input("")
