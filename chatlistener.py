@@ -1,17 +1,24 @@
 __version__ = 0.2
 __author__ = "Atli"
 
-import socket, os, json, time
+import socket, os, json, time, random
 from threading import Thread
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 from time import ctime
+directory = os.path.dirname(os.path.realpath(__file__))
+if not os.path.isfile(directory+"/userlist"):
+    filer = open(directory+"/userlist", "w")
+    filer.write(json.dumps({"admin":"admin"}))
+    filer.close
+filer = open(directory+"/userlist", "r")
+userlist = json.loads(filer.read())
+filer.close()  
 threads = []
 clientlist = []
 addrlist = []
 os.system("clear")
 connected = 0
 looplist = []
-userlist = {"atli":"atlariseverim", "easyly":"easyly"}
 listenmode = False
 newer = 0
 freshpool = []
@@ -70,7 +77,7 @@ def accept():
     c, addr = s.accept()
     connected += 1
     idle = "login"
-    prepare(c, "Welcome to Atli server login or signup")
+    prepare(c, "Welcome to Atli server login or register")
     print("{} has just connected.".format(addr))
     print(str(connected)+"/"+str(maxnumber))
     addrlist.append(addr)
@@ -92,11 +99,51 @@ def accept():
                 nicktosend = splitted[1]
                 messagetosend = splitted[2:]
                 try:
-                    connectedlist[nicktosend].send(bytes(json.dumps({"msg" : " ".join(messagetosend), "nick":nick}), "UTF-8"))
+                    connectedlist[nicktosend].send(bytes(json.dumps({"msg" : " ".join(messagetosend), "nick":nick+"(msg)"}), "UTF-8"))
                 except Exception as e:
                     prepare(c, "Couldnt found any user named "+nicktosend) 
         if idle == "login":
             try:
+                if received == "register":
+                    prepare(c, "please enter a nickname")
+                    try:
+                        registerusername = c.recv(1024).decode("utf-8")
+                        registerusername = json.loads(registerusername)
+                        registerusername = registerusername["msg"]
+                        if not registerusername in userlist:
+                            prepare(c, "Nick seems OK please enter a password")
+                            try:
+                                registerpass = c.recv(1024).decode("utf-8")
+                                registerpass = json.loads(registerpass)
+                                registerpass = registerpass["msg"]
+                                if not registerpass == "" or " ":
+                                    value_a = random.randrange(1, 20)
+                                    value_b = random.randrange(1, 20)
+                                    solve = value_a + value_b
+                                    prepare(c, "CAPTCHA: "+str(value_a)+" + "+str(value_b)+" =  ?")
+                                    try:
+                                        captcha = c.recv(1024).decode("utf-8")
+                                        captcha = json.loads(captcha)
+                                        captcha = captcha["msg"]
+                                        if captcha == str(solve):
+                                            prepare(c, "new user "+registerusername+" is registered.")
+                                            userlist[registerusername]= registerpass
+                                            filer = open(directory+"/userlist", "w")
+                                            filer.write(json.dumps(userlist))
+                                            filer.close()
+                                            print("newuser "+registerusername+" has just registered")
+                                        else:
+                                            prepare(c, "Captcha solve is not true")
+                                    except Exception as e:
+                                        pass
+                                else:
+                                    prepare(c, "password cant be empty")
+                            except Exception as e:
+                                pass
+                        else:
+                            prepare(c, "Nick is already taken")
+                    except Exception as e:
+                        pass
                 if received == "login":
                     prepare(c, "Please enter your username")
                     user = json.loads(c.recv(1024).decode("utf-8"))
@@ -105,14 +152,27 @@ def accept():
                     passwd = json.loads(c.recv(1024).decode("utf-8"))
                     passwd = passwd["msg"]
                     try:
-                        if userlist[user] == passwd:
-                            prepare(c, "Succesful Login please enter to a room (join roomname)")
-                            nick = user
-                            idle = "suspend"
-                        else:
+                        val_a = random.randrange(1, 20)
+                        val_b = random.randrange(1, 20)
+                        solve = val_a + val_b
+                        prepare(c, "CAPTCHA: "+str(val_a) + " + "+ str(val_b) + " = ?")
+                        try:
+                            glen = c.recv(1024).decode("utf-8")
+                            glen = json.loads(glen)
+                            glen = glen["msg"]
+                            if glen == str(solve):                   
+                                if userlist[user] == passwd:
+                                    prepare(c, "Succesful Login please enter to a room (join roomname)")
+                                    nick = user
+                                    idle = "suspend"
+                                else:
+                                    prepare(c, "Incorrect Authantication Details")
+                            else:
+                                prepare(c, "CAPTCHA solve is not correct")
+                        except Exception as e:
                             prepare(c, "Incorrect Authantication Details")
                     except Exception as e:
-                        prepare(c, "Incorrect Authantication Details")
+                        pass
             except Exception as e:
                 pass
                     
@@ -140,23 +200,25 @@ def accept():
             except Exception as e:
                 pass
         if idle == "room":
-            try:
-                gelen = receive
-                gelen = json.loads(gelen)
-                gelen["nick"] = nick
-                if listenmode == True:
-                    print("{} > {} > {}".format(nick, room, gelen["msg"]))
-                if gelen["msg"] == "bye":
-                    idle = "suspend"
-                    roomlist[room].remove(c)
-                    prepare(c, "You have just leaved the room")
-                    print("{} has just disconnected from {} channel".format(addr, room))
-                gelen = json.dumps(gelen)              
-                for users in roomlist[room]:
-                    if not users == c:
-                        users.send(bytes(gelen, "UTF-8"))
-            except Exception as a:
-                pass
+            if not "msg" in received:
+                if not "join" in received:
+                    try:
+                        gelen = receive
+                        gelen = json.loads(gelen)
+                        gelen["nick"] = nick
+                        if listenmode == True:
+                            print("{} > {} > {}".format(nick, room, gelen["msg"]))
+                        if gelen["msg"] == "bye":
+                            idle = "suspend"
+                            roomlist[room].remove(c)
+                            prepare(c, "You have just leaved the room")
+                            print("{} has just disconnected from {} channel".format(addr, room))
+                        gelen = json.dumps(gelen)              
+                        for users in roomlist[room]:
+                            if not users == c:
+                                users.send(bytes(gelen, "UTF-8"))
+                    except Exception as a:
+                        pass
         
         if receive == "":
             c.close()
@@ -170,38 +232,9 @@ def accept():
                 del connectedlist[nick]
             if idle == "room":
                 del connectedlist[nick]
-                roomlist[room].remove(c)
-                
+                roomlist[room].remove(c)                
             break
-"""
-        elif received == "login":
-            c.send(bytes(json.dumps({"msg":"please enter your username:", "nick":"SV"}), "utf-8"))
-            user = c.recv(1024).decode("utf-8")
-            user = json.loads(user)
-            user = user["msg"]
-            c.send(bytes(json.dumps({"msg":"ok need password","nick":"SV"}), "utf-8"))
-            passwd = c.recv(1024).decode("utf-8")
-            passwd = json.loads(passwd)
-            passwd = passwd["msg"]
-            try:
-                if userlist[user] == passwd:
-                    admin = True
-                    c.send(bytes(json.dumps({"msg":"login completed welcome {}".format(user), "nick":"SV"}), "utf-8"))
-                    print("{} is logged in.".format(user))
-                else:
-                    c.send(bytes(json.dumps({"msg":"incorrect authentication details", "nick":"SV"}), "UTF-8"))
-                    print("unsuccesful login attempt")
-            except Exception as e:
-                c.send(bytes(json.dumps({"msg":"incorrect authentication details", "nick":"SV"}), "UTF-8"))
-                print("unsuccesful login attempt")
-                pass
-        else:
-            if listenmode :
-                print(recved["nick"]+" > "+received)
-            for cli in clientlist:
-                if not cli == c:
-                    cli.send(bytes(receive, "UTF-8"))
-"""
+            
 def status():
     global listenmode
     inp = input("")
