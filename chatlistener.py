@@ -108,7 +108,7 @@ def accept():
                         registerusername = c.recv(1024).decode("utf-8")
                         registerusername = json.loads(registerusername)
                         registerusername = registerusername["msg"]
-                        if config.check_name(registerusername):
+                        if not config.check_name(registerusername):
                             prepare(c, "Nick seems OK please enter a password")
                             try:
                                 registerpass = c.recv(1024).decode("utf-8")
@@ -126,10 +126,6 @@ def accept():
                                         if captcha == str(solve):
                                             Register(registerusername, registerpass)
                                             prepare(c, "new user "+registerusername+" is registered.")
-                                            userlist[registerusername]= registerpass
-                                            filer = open(directory+"/userlist", "w")
-                                            filer.write(json.dumps(userlist))
-                                            filer.close()
                                             print("newuser "+registerusername+" has just registered")
                                         else:
                                             prepare(c, "Captcha solve is not true")
