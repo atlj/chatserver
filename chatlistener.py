@@ -3,16 +3,14 @@ __author__ = "Atli"
 
 import socket, os, json, time, random
 from threading import Thread
+from core import *
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 from time import ctime
 directory = os.path.dirname(os.path.realpath(__file__))
-if not os.path.isfile(directory+"/userlist"):
-    filer = open(directory+"/userlist", "w")
-    filer.write(json.dumps({"admin":"admin"}))
-    filer.close
-filer = open(directory+"/userlist", "r")
-userlist = json.loads(filer.read())
-filer.close()  
+
+
+config.DB_PATH = "data.db"
+config.create_table("user")
 threads = []
 clientlist = []
 addrlist = []
@@ -110,7 +108,7 @@ def accept():
                         registerusername = c.recv(1024).decode("utf-8")
                         registerusername = json.loads(registerusername)
                         registerusername = registerusername["msg"]
-                        if not registerusername in userlist:
+                        if config.check_name(registerusername):
                             prepare(c, "Nick seems OK please enter a password")
                             try:
                                 registerpass = c.recv(1024).decode("utf-8")
@@ -126,6 +124,7 @@ def accept():
                                         captcha = json.loads(captcha)
                                         captcha = captcha["msg"]
                                         if captcha == str(solve):
+                                            Register(registerusername, registerpass)
                                             prepare(c, "new user "+registerusername+" is registered.")
                                             userlist[registerusername]= registerpass
                                             filer = open(directory+"/userlist", "w")
@@ -161,7 +160,7 @@ def accept():
                             glen = json.loads(glen)
                             glen = glen["msg"]
                             if glen == str(solve):                   
-                                if userlist[user] == passwd:
+                                if Login(user,passwd).check():
                                     prepare(c, "Succesful Login please enter to a room (join roomname)")
                                     nick = user
                                     idle = "suspend"

@@ -53,6 +53,10 @@ class config:
 
         return users
 
+    @staticmethod
+    def check_user(name):                               
+        for i in config.list_users():                                   if i == .name:                                                  return True                                             else:                                                           return False
+
 
 
 class Login:
@@ -95,6 +99,7 @@ class Register:
 
         c.close()
         db.close()
+
 
 
 class Server():
